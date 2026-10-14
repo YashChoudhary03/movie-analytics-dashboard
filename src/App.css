@@ -626,7 +626,10 @@ a {
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(220px, 1.8fr) repeat(2, minmax(130px, 1.2fr)) repeat(3, minmax(110px, 1fr));
+  grid-template-columns:
+    minmax(0, 1.8fr)
+    repeat(2, minmax(0, 1.2fr))
+    repeat(3, minmax(0, 1fr));
   gap: 10px;
   padding: 16px 24px;
   background: var(--surface-alt);
@@ -635,11 +638,13 @@ a {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   align-items: center;
 }
 
 .filters > * {
   min-width: 0;
+  width: 100%;
   max-width: 100%;
   box-sizing: border-box;
 }
