@@ -1,4 +1,3 @@
-
 import pg from "pg";
 
 const { Pool } = pg;
@@ -11,8 +10,9 @@ function getPool() {
       throw new Error("DATABASE_URL is not configured");
     }
 
+    const connectionString = process.env.DATABASE_URL.replace(/^["']|["']$/g, "").trim();
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString,
       ssl: { rejectUnauthorized: false },
       max: 3,
       idleTimeoutMillis: 10000,
@@ -24,8 +24,25 @@ function getPool() {
 }
 
 function parseList(value) {
-  if (typeof value !== "string" || !value.trim()) return [];
-  return value.split(",").map((item) => item.trim()).filter(Boolean);
+  const entries = Array.isArray(value) ? value : [value];
+  return entries
+    .flatMap((entry) => (typeof entry === "string" ? entry.split(",") : []))
+    .map((item) => item.replace(/\+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function parseDirectors(idsValue, namesValue) {
+  const combined = [...parseList(idsValue), ...parseList(namesValue)];
+  const ids = [];
+  const names = [];
+  for (const item of combined) {
+    if (/^\d+$/.test(item)) {
+      ids.push(Number(item));
+    } else {
+      names.push(item);
+    }
+  }
+  return { ids, names };
 }
 
 function positiveInteger(value, fallback, maximum) {
@@ -50,6 +67,7 @@ export default async function handler(req, res) {
       search = "",
       genres = "",
       directors = "",
+      directorIds = "",
       language = "",
       yearFrom = "",
       yearTo = "",
@@ -71,10 +89,39 @@ export default async function handler(req, res) {
       conditions.push(sql.replace("?", `$${values.length}`));
     }
 
+    // ── Search: title OR director name (case-insensitive, full name + individual terms) ──
     if (typeof search === "string" && search.trim()) {
-      addCondition("m.title ILIKE ?", `%${search.trim().slice(0, 100)}%`);
+      const phrase = search
+        .replace(/\+/g, " ")
+        .trim()
+        .replace(/\s+/g, " ")
+        .slice(0, 100);
+
+      values.push(`%${phrase}%`);
+      const phraseParam = `$${values.length}`;
+
+      const words = phrase.split(" ").filter(Boolean);
+      const directorTerms = words.map((term) => {
+        values.push(`%${term}%`);
+        return `d2.director_name ILIKE $${values.length}`;
+      });
+
+      conditions.push(`(
+        m.title ILIKE ${phraseParam}
+        OR EXISTS (
+          SELECT 1
+          FROM public.movie_directors md2
+          JOIN public.directors d2 ON d2.director_id = md2.director_id
+          WHERE md2.movie_id = m.movie_id
+            AND (
+              d2.director_name ILIKE ${phraseParam}
+              OR (${directorTerms.join(" AND ")})
+            )
+        )
+      )`);
     }
 
+    // ── Genre filter (OR logic within genres) ──
     const selectedGenres = parseList(genres);
     if (selectedGenres.length) {
       values.push(selectedGenres);
@@ -89,24 +136,35 @@ export default async function handler(req, res) {
       `);
     }
 
-    const selectedDirectors = parseList(directors);
-    if (selectedDirectors.length) {
-      values.push(selectedDirectors);
+    // ── Director filter (OR logic within directors, supports IDs and names) ──
+    const selectedDirectors = parseDirectors(directorIds, directors);
+    if (selectedDirectors.ids.length || selectedDirectors.names.length) {
+      const directorConds = [];
+      if (selectedDirectors.ids.length) {
+        values.push(selectedDirectors.ids);
+        directorConds.push(`md.director_id = ANY($${values.length}::int[])`);
+      }
+      if (selectedDirectors.names.length) {
+        values.push(selectedDirectors.names);
+        directorConds.push(`d.director_name = ANY($${values.length}::text[])`);
+      }
       conditions.push(`
         EXISTS (
           SELECT 1
           FROM public.movie_directors md
           JOIN public.directors d ON d.director_id = md.director_id
           WHERE md.movie_id = m.movie_id
-            AND d.director_name = ANY($${values.length}::text[])
+            AND (${directorConds.join(" OR ")})
         )
       `);
     }
 
+    // ── Language ──
     if (typeof language === "string" && language.trim()) {
       addCondition("m.original_language = ?", language.trim());
     }
 
+    // ── Year range (inclusive) ──
     if (yearFrom !== "") {
       const year = Number(yearFrom);
       if (!Number.isInteger(year) || year < 1800 || year > 2200) {
@@ -123,6 +181,7 @@ export default async function handler(req, res) {
       addCondition("m.release_year <= ?", year);
     }
 
+    // ── Minimum rating ──
     if (minRating !== "") {
       const rating = Number(minRating);
       if (!Number.isFinite(rating) || rating < 0 || rating > 10) {

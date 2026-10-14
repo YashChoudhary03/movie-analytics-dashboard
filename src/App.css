@@ -605,8 +605,9 @@ a {
 /* ---------- Library ---------- */
 .library-panel {
   padding: 24px 0 0;
-  overflow: hidden;
+  /* No overflow:hidden — it would clip the dropdown menus */
 }
+
 
 .library-heading {
   padding: 0 24px 20px;
@@ -625,17 +626,28 @@ a {
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(200px, 1.7fr) repeat(4, minmax(120px, 1fr));
+  grid-template-columns: minmax(220px, 1.8fr) repeat(2, minmax(130px, 1.2fr)) repeat(3, minmax(110px, 1fr));
   gap: 10px;
   padding: 16px 24px;
   background: var(--surface-alt);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  align-items: center;
+}
+
+.filters > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .search-field {
   display: flex;
   min-width: 0;
+  max-width: 100%;
   height: 42px;
   align-items: center;
   gap: 8px;
@@ -644,7 +656,8 @@ a {
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 
 .search-field:focus-within {
@@ -661,6 +674,7 @@ a {
   border: 0;
   outline: none;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 .search-field input::placeholder {
@@ -680,6 +694,7 @@ a {
   background: transparent;
   border: 0;
   border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
 }
 
 .search-field button:hover {
@@ -687,37 +702,37 @@ a {
   background: #eef1f7;
 }
 
-.filters select,
-.advanced-filters input {
+.filters select {
   width: 100%;
   min-width: 0;
+  max-width: 100%;
   height: 42px;
-  padding: 0 12px;
+  padding: 0 28px 0 12px;
   color: var(--text-2);
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   outline: none;
   font-size: 13px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.filters select {
-  padding-right: 30px;
+  font-weight: 500;
   cursor: pointer;
   appearance: none;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b788f' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 11px center;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.15s;
 }
 
-.filters select:hover,
-.advanced-filters input:hover {
+.filters select:hover {
   border-color: #c3cfe4;
+  background-color: #fdfefe;
 }
 
-.filters select:focus,
-.advanced-filters input:focus {
+.filters select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-ring);
 }
@@ -725,16 +740,23 @@ a {
 .advanced-filters {
   display: flex;
   align-items: flex-end;
+  flex-wrap: wrap;
   gap: 14px;
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
 
 .advanced-filters label {
   display: flex;
   width: 160px;
+  min-width: 120px;
+  max-width: 100%;
   flex-direction: column;
   gap: 6px;
+  box-sizing: border-box;
 }
 
 .advanced-filters label span {
@@ -743,23 +765,49 @@ a {
   font-weight: 600;
 }
 
+.advanced-filters input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  outline: none;
+  font-size: 13px;
+  box-sizing: border-box;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.advanced-filters input:hover {
+  border-color: #c3cfe4;
+}
+
+.advanced-filters input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
 .clear-filters {
   display: inline-flex;
   min-height: 42px;
   align-items: center;
   gap: 6px;
   margin-left: auto;
-  padding: 0 14px;
+  padding: 0 16px;
   color: var(--text-2);
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  box-sizing: border-box;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
 }
 
-.clear-filters:hover {
+.clear-filters:hover:not(:disabled) {
   color: var(--primary-strong);
   background: #f5f8ff;
   border-color: #b7caff;
@@ -1006,7 +1054,7 @@ a {
   }
 }
 
-@media (max-width: 1250px) {
+@media (max-width: 1400px) {
   :root {
     --sidebar-w: 224px;
   }
@@ -1038,12 +1086,34 @@ a {
     padding: 20px 0 0;
   }
 
+  /* Moves search to full row, 5 dropdowns neatly spaced across second row */
   .filters {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .search-field {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1080px) {
+  /* Tablet layout: Search row 1, Genre+Director row 2 (50% each), Selects row 3 (33.3% each) */
+  .filters {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .search-field {
+    grid-column: 1 / -1;
+  }
+
+  .multi-select-filter {
     grid-column: span 3;
+  }
+
+  .filters select {
+    grid-column: span 2;
   }
 }
 
@@ -1197,7 +1267,7 @@ a {
 
   .filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 14px 16px;
+    padding: 12px 16px;
     gap: 8px;
   }
 
@@ -1205,14 +1275,34 @@ a {
     grid-column: 1 / -1;
   }
 
+  .multi-select-filter {
+    grid-column: span 1;
+  }
+
+  .filters select {
+    grid-column: span 1;
+  }
+
+  /* Any rating spans the full row on mobile for clean symmetry */
+  .filters select:last-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Prevent dropdowns from escaping viewport on small screens */
+  .multi-select-menu {
+    width: min(240px, calc(100vw - 32px));
+  }
+
   .advanced-filters {
     flex-wrap: wrap;
     gap: 10px;
-    padding: 14px 16px;
+    padding: 12px 16px;
   }
 
   .advanced-filters label {
-    width: calc(50% - 5px);
+    flex: 1 1 calc(50% - 5px);
+    width: auto;
+    min-width: 120px;
   }
 
   .clear-filters {
@@ -1267,4 +1357,231 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---------- Multi-select filter (Genre & Director) ---------- */
+
+/*
+ * .multi-select-filter is the wrapper that establishes the stacking context.
+ * The trigger button is styled to match .filters select exactly.
+ * The menu is absolutely positioned below the trigger and must NOT be clipped
+ * by any ancestor with overflow:hidden — see .library-panel fix above.
+ */
+
+.multi-select-filter {
+  position: relative;
+  min-width: 0;
+}
+
+.filter-trigger {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.filter-trigger:hover {
+  border-color: #c3cfe4;
+}
+
+.filter-trigger[aria-expanded="true"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.filter-trigger-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.filter-trigger-arrow {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Drop-down panel */
+.multi-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 200; /* Well above topbar (z:10) and sidebar (z:20) */
+  width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgb(23 32 51 / 14%);
+}
+
+/* Taller variant for director (has internal search) */
+.multi-select-menu--tall {
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* children scroll individually */
+}
+
+/* Search box inside director dropdown */
+.multi-select-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.multi-select-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.multi-select-search input::placeholder {
+  color: #9aa5b8;
+}
+
+.multi-select-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.multi-select-search button {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  border-radius: 4px;
+}
+
+.multi-select-search button:hover {
+  color: var(--text);
+  background: #eef1f7;
+}
+
+.multi-select-search svg {
+  color: var(--faint);
+  flex-shrink: 0;
+}
+
+/* Scrollable list inside tall dropdown */
+.multi-select-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Individual option row */
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.multi-select-option:hover {
+  background: #f4f7ff;
+  color: var(--primary-strong);
+}
+
+.multi-select-option.is-checked {
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  font-weight: 600;
+}
+
+.multi-select-option input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Clear-all footer button */
+.multi-select-clear {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 4px;
+  color: var(--danger);
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.multi-select-clear:hover {
+  background: var(--danger-soft);
+}
+
+/* Empty / loading state inside dropdown */
+.multi-select-empty {
+  padding: 14px 10px;
+  color: var(--faint);
+  font-size: 13px;
+  text-align: center;
+}
+
+
+/* Fix year dropdown visibility */
+.advanced-filters select {
+  appearance: auto;
+  -webkit-appearance: menulist;
+  background-color: #ffffff !important;
+  color: #334155 !important;
+  border: 1px solid #d7e0ee;
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 10px 12px;
+  font: inherit;
+  opacity: 1;
+}
+
+.advanced-filters select option {
+  background-color: #ffffff;
+  color: #334155;
 }

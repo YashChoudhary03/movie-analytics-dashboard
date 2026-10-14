@@ -11,8 +11,9 @@ function getPool() {
       throw new Error("DATABASE_URL is not configured");
     }
 
+    const connectionString = process.env.DATABASE_URL.replace(/^["']|["']$/g, "").trim();
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString,
       ssl: { rejectUnauthorized: false },
       max: 3,
       idleTimeoutMillis: 10000,
@@ -34,7 +35,13 @@ export default async function handler(req, res) {
   try {
     const db = getPool();
 
-    const [summaryResult, genreResult, availableGenresResult] =
+  const [
+  summaryResult,
+  genreResult,
+  availableGenresResult,
+  availableYearsResult,
+  availableDirectorsResult,
+] =
       await Promise.all([
         db.query(`
           SELECT
@@ -63,20 +70,37 @@ export default async function handler(req, res) {
           FROM public.genres
           ORDER BY genre_name ASC
         `),
+          db.query(`
+            SELECT DISTINCT release_year
+            FROM public.movies
+            WHERE release_year IS NOT NULL
+            ORDER BY release_year DESC
+        `),
+          db.query(`
+            SELECT director_name
+            FROM public.directors
+            ORDER BY director_name ASC
+        `),
       ]);
 
     const summary = summaryResult.rows[0];
 
-    return res.status(200).json({
-      summary: {
-        ...summary,
-        totalRevenue: String(summary.totalRevenue),
-      },
-      genres: genreResult.rows,
-      availableGenres: availableGenresResult.rows.map(
-        (row) => row.genre_name
-      ),
-    });
+        return res.status(200).json({
+        summary: {
+            ...summary,
+            totalRevenue: String(summary.totalRevenue),
+        },
+        genres: genreResult.rows,
+        availableGenres: availableGenresResult.rows.map(
+            (row) => row.genre_name
+        ),
+        availableYears: availableYearsResult.rows.map(
+            (row) => row.release_year
+        ),
+        availableDirectors: availableDirectorsResult.rows.map(
+            (row) => row.director_name
+        ),
+        });
   } catch (error) {
     console.error("Analytics API error:", error.message);
     return res.status(500).json({

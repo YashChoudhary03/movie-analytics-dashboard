@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   CalendarDays,
@@ -29,12 +29,12 @@ import "./App.css";
 
 const PAGE_SIZE = 12;
 const DEBOUNCE_MS = 350;
-const MIN_YEAR = 1900;
-const MAX_YEAR = 2035;
+
 
 const DEFAULT_FILTERS = {
   search: "",
-  genre: "",
+  genres: [],
+  directors: [],
   language: "",
   sort: "popularity",
   yearFrom: "",
@@ -105,6 +105,18 @@ async function fetchJson(url, { signal, errorMessage }) {
   return response.json();
 }
 
+/**
+ * Counts how many filters differ from the defaults.
+ * Handles arrays correctly by comparing their serialised forms.
+ */
+function countActiveFilters(filters) {
+  return Object.entries(filters).filter(([key, value]) => {
+    const def = DEFAULT_FILTERS[key];
+    if (Array.isArray(value)) return value.length !== def.length;
+    return value !== def;
+  }).length;
+}
+
 /* ---------- App ---------- */
 
 function App() {
@@ -117,49 +129,160 @@ function App() {
   const [moviesLoading, setMoviesLoading] = useState(true);
   const [moviesError, setMoviesError] = useState("");
 
+  // Cascading filter options from /api/filters
+  const [filterOptions, setFilterOptions] = useState({
+  availableGenres: [],
+  availableDirectors: [],
+  availableYears: [],
+});
+const [filterOptionsLoading, setFilterOptionsLoading] = useState(false);
+const [filterOptionsError, setFilterOptionsError] = useState("");
+
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Dropdown open states
+  const [genreMenuOpen, setGenreMenuOpen] = useState(false);
+  const [directorMenuOpen, setDirectorMenuOpen] = useState(false);
+  const [directorSearch, setDirectorSearch] = useState("");
+
+  // Refs for click-outside detection
+  const genreRef = useRef(null);
+  const directorRef = useRef(null);
 
   // Only text/number inputs are debounced; selects apply immediately.
   const debouncedSearch = useDebounced(filters.search.trim());
   const debouncedYearFrom = useDebounced(filters.yearFrom);
   const debouncedYearTo = useDebounced(filters.yearTo);
 
-  const { genre, language, sort, minRating } = filters;
+  const { genres, directors, language, sort, minRating } = filters;
 
-  /* ----- Analytics ----- */
+  // Pre-computed join strings so useEffect dependency arrays don't contain
+  // inline expressions (satisfies react-hooks/exhaustive-deps)
+  const genreKey = genres.join(",");
+  const directorKey = directors.join(",");
 
-  const loadAnalytics = useCallback(async (signal) => {
-    setAnalyticsLoading(true);
-    setAnalyticsError("");
 
-    try {
-      const result = await fetchJson("/api/analytics", {
-        signal,
-        errorMessage: "Unable to load analytics.",
-      });
-      setAnalytics(result);
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      setAnalyticsError(err.message || "Analytics could not be loaded.");
-    } finally {
-      if (!signal?.aborted) setAnalyticsLoading(false);
-    }
-  }, []);
+  /* ----- Close dropdowns on outside click or Escape ----- */
 
   useEffect(() => {
+    function handleClick(e) {
+      if (genreRef.current && !genreRef.current.contains(e.target)) {
+        setGenreMenuOpen(false);
+      }
+      if (directorRef.current && !directorRef.current.contains(e.target)) {
+        setDirectorMenuOpen(false);
+        setDirectorSearch("");
+      }
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        setGenreMenuOpen(false);
+        setDirectorMenuOpen(false);
+        setDirectorSearch("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  /* ----- Analytics (global stats + chart — not cascaded) ----- */
+
+  // Inlined as a named async function inside the effect so setState calls
+  // are inside an async callback, not synchronously in the effect body.
+  // This satisfies react-hooks/set-state-in-effect (react-hooks v7+).
+  useEffect(() => {
     const controller = new AbortController();
-    loadAnalytics(controller.signal);
+
+    async function loadAnalytics() {
+      setAnalyticsLoading(true);
+      setAnalyticsError("");
+      try {
+        const result = await fetchJson("/api/analytics", {
+          signal: controller.signal,
+          errorMessage: "Unable to load analytics.",
+        });
+        setAnalytics(result);
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        setAnalyticsError(err.message || "Analytics could not be loaded.");
+      } finally {
+        if (!controller.signal.aborted) setAnalyticsLoading(false);
+      }
+    }
+
+    loadAnalytics();
     return () => controller.abort();
-  }, [loadAnalytics, reloadKey]);
+  }, [reloadKey]);
+
+
+
+
+  /* ----- Cascading filter options from /api/filters ----- */
+
+  useEffect(() => {
+  const controller = new AbortController();
+
+  async function loadFilterOptions() {
+    setFilterOptionsLoading(true);
+    setFilterOptionsError("");
+    try {
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (genreKey) params.set("genres", genreKey);
+      if (directorKey) {
+        params.set("directorIds", directorKey);
+        params.set("directors", directorKey);
+      }
+      if (language) params.set("language", language);
+      if (debouncedYearFrom) params.set("yearFrom", debouncedYearFrom);
+      if (debouncedYearTo) params.set("yearTo", debouncedYearTo);
+      if (minRating) params.set("minRating", minRating);
+
+      const result = await fetchJson(`/api/filters?${params}`, {
+        signal: controller.signal,
+        errorMessage: "Could not load filter options.",
+      });
+
+      setFilterOptions({
+        availableGenres: result.availableGenres || [],
+        availableDirectors: result.availableDirectors || [],
+        availableYears: (result.availableYears || []).map(String),
+      });
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      setFilterOptionsError(err.message || "Could not load filter options.");
+    } finally {
+      if (!controller.signal.aborted) setFilterOptionsLoading(false);
+    }
+  }
+
+  loadFilterOptions();
+  return () => controller.abort();
+}, [
+  debouncedSearch,
+  genreKey,
+  directorKey,
+  language,
+  minRating,
+  debouncedYearFrom,
+  debouncedYearTo,
+  reloadKey,
+]);
 
   /* ----- Movies (stale requests are aborted) ----- */
 
   useEffect(() => {
     const controller = new AbortController();
 
-    const load = async () => {
+    async function loadMovies() {
       setMoviesLoading(true);
       setMoviesError("");
 
@@ -171,7 +294,11 @@ function App() {
         });
 
         if (debouncedSearch) params.set("search", debouncedSearch);
-        if (genre) params.set("genres", genre);
+        if (genreKey) params.set("genres", genreKey);
+        if (directorKey) {
+          params.set("directorIds", directorKey);
+          params.set("directors", directorKey);
+        }
         if (language) params.set("language", language);
         if (debouncedYearFrom) params.set("yearFrom", debouncedYearFrom);
         if (debouncedYearTo) params.set("yearTo", debouncedYearTo);
@@ -191,21 +318,23 @@ function App() {
       } finally {
         if (!controller.signal.aborted) setMoviesLoading(false);
       }
-    };
+    }
 
-    load();
+    loadMovies();
     return () => controller.abort();
   }, [
     page,
     sort,
-    genre,
+    genreKey,
+    directorKey,
+    debouncedSearch,
     language,
     minRating,
-    debouncedSearch,
     debouncedYearFrom,
     debouncedYearTo,
     reloadKey,
   ]);
+
 
   /* ----- Handlers ----- */
 
@@ -222,25 +351,53 @@ function App() {
 
   const resetFilters = () => {
     setFilters(DEFAULT_FILTERS);
+    setDirectorSearch("");
     setPage(1);
   };
 
   const refreshAll = () => setReloadKey((key) => key + 1);
 
+  const toggleGenre = (item) => {
+    setFilters((current) => ({
+      ...current,
+      genres: current.genres.includes(item)
+        ? current.genres.filter((g) => g !== item)
+        : [...current.genres, item],
+    }));
+    setPage(1);
+  };
+
+  const toggleDirector = (directorId) => {
+    const idStr = String(directorId);
+    setFilters((current) => ({
+      ...current,
+      directors: current.directors.some((id) => String(id) === idStr)
+        ? current.directors.filter((id) => String(id) !== idStr)
+        : [...current.directors, idStr],
+    }));
+    setPage(1);
+  };
+
   const activeFilterCount = useMemo(
-    () =>
-      Object.entries(filters).filter(
-        ([key, value]) => value !== "" && value !== DEFAULT_FILTERS[key]
-      ).length,
+    () => countActiveFilters(filters),
     [filters]
   );
 
   const summary = analytics?.summary;
-  const availableGenres = analytics?.availableGenres || [];
   const topGenres = useMemo(
     () => (analytics?.genres || []).slice(0, 10),
     [analytics]
   );
+
+  // Filtered director list for the searchable dropdown
+  const filteredDirectorOptions = useMemo(() => {
+    const q = directorSearch.trim().toLowerCase();
+    if (!q) return filterOptions.availableDirectors;
+    return filterOptions.availableDirectors.filter((director) =>
+      (director?.name || "").toLowerCase().includes(q)
+    );
+  }, [filterOptions.availableDirectors, directorSearch]);
+
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
   const busy = moviesLoading || analyticsLoading;
@@ -453,13 +610,15 @@ function App() {
               </span>
             </div>
 
+            {/* ── Primary filters row ── */}
             <div className="filters">
+              {/* Search */}
               <label className="search-field">
                 <Search size={18} aria-hidden="true" />
                 <input
                   type="search"
-                  placeholder="Search movies…"
-                  aria-label="Search movies"
+                  placeholder="Search by title or director…"
+                  aria-label="Search by title or director"
                   value={filters.search}
                   onChange={updateFilter("search")}
                 />
@@ -474,19 +633,156 @@ function App() {
                 )}
               </label>
 
-              <select
-                aria-label="Filter by genre"
-                value={filters.genre}
-                onChange={updateFilter("genre")}
-              >
-                <option value="">All genres</option>
-                {availableGenres.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+              {/* Genre multi-select */}
+              <div className="multi-select-filter" ref={genreRef}>
+                <button
+                  type="button"
+                  className="filter-trigger"
+                  onClick={() => setGenreMenuOpen((o) => !o)}
+                  aria-expanded={genreMenuOpen}
+                  aria-haspopup="listbox"
+                  aria-label="Choose genres"
+                >
+                  <span className="filter-trigger-text">
+                    {filters.genres.length
+                      ? `${filters.genres.length} genre${filters.genres.length > 1 ? "s" : ""} selected`
+                      : "All genres"}
+                  </span>
+                  <span className="filter-trigger-arrow" aria-hidden="true">▾</span>
+                </button>
 
+                {genreMenuOpen && (
+                  <div className="multi-select-menu" role="listbox" aria-multiselectable="true" aria-label="Genre options">
+                    {filterOptionsLoading && filterOptions.availableGenres.length === 0 ? (
+                      <div className="multi-select-empty">Loading…</div>
+                    ) : filterOptions.availableGenres.length === 0 ? (
+                      <div className="multi-select-empty">No genres available</div>
+                    ) : (
+                      filterOptions.availableGenres.map((item) => {
+                        const checked = filters.genres.includes(item);
+                        return (
+                          <label
+                            key={item}
+                            className={`multi-select-option${checked ? " is-checked" : ""}`}
+                            role="option"
+                            aria-selected={checked}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleGenre(item)}
+                            />
+                            <span>{item}</span>
+                          </label>
+                        );
+                      })
+                    )}
+                    {filters.genres.length > 0 && (
+                      <button
+                        type="button"
+                        className="multi-select-clear"
+                        onClick={() => {
+                          setFilters((c) => ({ ...c, genres: [] }));
+                          setPage(1);
+                        }}
+                      >
+                        <X size={13} /> Clear genres
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Director multi-select (searchable) */}
+              <div className="multi-select-filter" ref={directorRef}>
+                <button
+                  type="button"
+                  className="filter-trigger"
+                  onClick={() => setDirectorMenuOpen((o) => !o)}
+                  aria-expanded={directorMenuOpen}
+                  aria-haspopup="listbox"
+                  aria-label="Choose directors"
+                >
+                  <span className="filter-trigger-text">
+                    {filters.directors.length
+                      ? `${filters.directors.length} director${filters.directors.length > 1 ? "s" : ""} selected`
+                      : "All directors"}
+                  </span>
+                  <span className="filter-trigger-arrow" aria-hidden="true">▾</span>
+                </button>
+
+                {directorMenuOpen && (
+                  <div className="multi-select-menu multi-select-menu--tall" role="listbox" aria-multiselectable="true" aria-label="Director options">
+                    {/* Search box inside dropdown */}
+                    <div className="multi-select-search">
+                      <Search size={14} aria-hidden="true" />
+                      <input
+                        type="search"
+                        placeholder="Search directors…"
+                        aria-label="Search directors"
+                        value={directorSearch}
+                        onChange={(e) => setDirectorSearch(e.target.value)}
+                        autoFocus
+                      />
+                      {directorSearch && (
+                        <button
+                          type="button"
+                          aria-label="Clear director search"
+                          onClick={() => setDirectorSearch("")}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="multi-select-list">
+                      {filterOptionsLoading && filterOptions.availableDirectors.length === 0 ? (
+                        <div className="multi-select-empty">Loading…</div>
+                      ) : filteredDirectorOptions.length === 0 ? (
+                        <div className="multi-select-empty">
+                          {directorSearch ? "No directors match your search" : "No directors available"}
+                        </div>
+                      ) : (
+                        filteredDirectorOptions.map((director) => {
+                          const checked = filters.directors.some(
+                            (id) => String(id) === String(director.id)
+                          );
+                          return (
+                            <label
+                              key={director.id}
+                              className={`multi-select-option${checked ? " is-checked" : ""}`}
+                              role="option"
+                              aria-selected={checked}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleDirector(director.id)}
+                              />
+                              <span>{director.name}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {filters.directors.length > 0 && (
+                      <button
+                        type="button"
+                        className="multi-select-clear"
+                        onClick={() => {
+                          setFilters((c) => ({ ...c, directors: [] }));
+                          setPage(1);
+                        }}
+                      >
+                        <X size={13} /> Clear directors
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Language */}
               <select
                 aria-label="Filter by language"
                 value={filters.language}
@@ -500,6 +796,7 @@ function App() {
                 ))}
               </select>
 
+              {/* Sort */}
               <select
                 aria-label="Sort movies"
                 value={filters.sort}
@@ -512,6 +809,7 @@ function App() {
                 ))}
               </select>
 
+              {/* Rating */}
               <select
                 aria-label="Minimum rating"
                 value={filters.minRating}
@@ -526,31 +824,37 @@ function App() {
               </select>
             </div>
 
+            {/* ── Advanced filters (year range + clear) ── */}
             <div className="advanced-filters">
+
               <label>
                 <span>Release year from</span>
                 <input
                   type="number"
                   inputMode="numeric"
-                  min={MIN_YEAR}
-                  max={MAX_YEAR}
+                  min={1916}
+                  max={2017}
                   placeholder="e.g. 2000"
+                  aria-label="Release year from"
                   value={filters.yearFrom}
                   onChange={updateFilter("yearFrom")}
                 />
               </label>
+
               <label>
                 <span>Release year to</span>
                 <input
                   type="number"
                   inputMode="numeric"
-                  min={MIN_YEAR}
-                  max={MAX_YEAR}
-                  placeholder="e.g. 2025"
+                  min={1916}
+                  max={2017}
+                  placeholder="e.g. 2015"
+                  aria-label="Release year to"
                   value={filters.yearTo}
                   onChange={updateFilter("yearTo")}
                 />
               </label>
+
 
               <button
                 type="button"
@@ -563,6 +867,11 @@ function App() {
                 {activeFilterCount > 0 && ` (${activeFilterCount})`}
               </button>
             </div>
+
+{filterOptionsError && (
+  <ErrorBanner message={filterOptionsError} onRetry={refreshAll} />
+)}
+
 
             {moviesError && (
               <ErrorBanner message={moviesError} onRetry={refreshAll} />
@@ -740,8 +1049,8 @@ function MovieRow({ movie }) {
         </span>
       </td>
       <td>{formatNumber(movie.popularity, { maximumFractionDigits: 1 })}</td>
-       <td>
-          {Number(movie.revenue) > 0 ? money(movie.revenue) : "N/A"}
+      <td>
+        {Number(movie.revenue) > 0 ? money(movie.revenue) : "N/A"}
       </td>
     </tr>
   );
