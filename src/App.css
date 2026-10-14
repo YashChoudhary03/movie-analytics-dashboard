@@ -959,6 +959,46 @@ a {
   margin-right: 8px;
 }
 
+.empty-results-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 16px;
+}
+
+.empty-results-message p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.empty-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  border: 1px solid #d5e2ff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.empty-action-btn:hover {
+  background: #e4edff;
+  border-color: #bcccff;
+}
+
+.empty-action-btn svg {
+  margin-right: 0;
+}
+
 /* ---------- Pagination ---------- */
 .pagination {
   display: flex;

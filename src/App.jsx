@@ -896,10 +896,32 @@ const [filterOptionsError, setFilterOptionsError] = useState("");
                       Loading movies…
                     </MessageRow>
                   ) : moviesError ? (
-                    <MessageRow>Movies could not be loaded.</MessageRow>
+                    <MessageRow>
+                      <div className="empty-results-message">
+                        <p>{moviesError}</p>
+                        <button
+                          type="button"
+                          className="empty-action-btn"
+                          onClick={refreshAll}
+                        >
+                          <RefreshCw size={14} /> Retry
+                        </button>
+                      </div>
+                    </MessageRow>
                   ) : movies.length === 0 ? (
                     <MessageRow>
-                      No movies match your filters. Try changing your search.
+                      <div className="empty-results-message">
+                        <p>No movies found. Try changing your filters or search terms.</p>
+                        {activeFilterCount > 0 && (
+                          <button
+                            type="button"
+                            className="empty-action-btn"
+                            onClick={resetFilters}
+                          >
+                            <X size={14} /> Clear all filters
+                          </button>
+                        )}
+                      </div>
                     </MessageRow>
                   ) : (
                     movies.map((movie) => (
