@@ -42,16 +42,6 @@ const DEFAULT_FILTERS = {
   minRating: "",
 };
 
-const LANGUAGES = [
-  { value: "en", label: "English" },
-  { value: "fr", label: "French" },
-  { value: "es", label: "Spanish" },
-  { value: "hi", label: "Hindi" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "zh", label: "Chinese" },
-];
-
 const SORT_OPTIONS = [
   { value: "popularity", label: "Most popular" },
   { value: "rating", label: "Highest rated" },
@@ -61,7 +51,36 @@ const SORT_OPTIONS = [
   { value: "title", label: "Title A–Z" },
 ];
 
-const RATING_OPTIONS = [5, 6, 7, 8];
+let languageDisplayNames;
+try {
+  languageDisplayNames = new Intl.DisplayNames(["en"], { type: "language" });
+} catch {
+  languageDisplayNames = null;
+}
+
+const LANGUAGE_NAME_OVERRIDES = {
+  cn: "Cantonese",
+  xx: "No linguistic content",
+};
+
+function getLanguageLabel(code) {
+  if (!code) return "";
+  const normalized = code.toLowerCase();
+  if (LANGUAGE_NAME_OVERRIDES[normalized]) {
+    return LANGUAGE_NAME_OVERRIDES[normalized];
+  }
+  if (languageDisplayNames) {
+    try {
+      const name = languageDisplayNames.of(normalized);
+      if (name && name.toLowerCase() !== normalized) {
+        return name;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return normalized.toUpperCase();
+}
 
 const EMPTY_PAGINATION = {
   page: 1,
@@ -131,10 +150,12 @@ function App() {
 
   // Cascading filter options from /api/filters
   const [filterOptions, setFilterOptions] = useState({
-  availableGenres: [],
-  availableDirectors: [],
-  availableYears: [],
-});
+    availableGenres: [],
+    availableDirectors: [],
+    availableYears: [],
+    availableLanguages: [],
+    availableRatings: [5, 6, 7, 8],
+  });
 const [filterOptionsLoading, setFilterOptionsLoading] = useState(false);
 const [filterOptionsError, setFilterOptionsError] = useState("");
 
@@ -255,6 +276,8 @@ const [filterOptionsError, setFilterOptionsError] = useState("");
         availableGenres: result.availableGenres || [],
         availableDirectors: result.availableDirectors || [],
         availableYears: (result.availableYears || []).map(String),
+        availableLanguages: result.availableLanguages || [],
+        availableRatings: result.availableRatings || [],
       });
     } catch (err) {
       if (err.name === "AbortError") return;
@@ -397,6 +420,29 @@ const [filterOptionsError, setFilterOptionsError] = useState("");
       (director?.name || "").toLowerCase().includes(q)
     );
   }, [filterOptions.availableDirectors, directorSearch]);
+
+  // Dynamic language options derived from /api/filters
+  const languageOptions = useMemo(() => {
+    const codes = new Set(filterOptions.availableLanguages || []);
+    if (filters.language) {
+      codes.add(filters.language);
+    }
+    return Array.from(codes)
+      .map((code) => ({
+        value: code,
+        label: getLanguageLabel(code),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [filterOptions.availableLanguages, filters.language]);
+
+  // Dynamic minimum rating thresholds derived from /api/filters
+  const ratingOptions = useMemo(() => {
+    const ratings = new Set(filterOptions.availableRatings || []);
+    if (filters.minRating) {
+      ratings.add(Number(filters.minRating));
+    }
+    return Array.from(ratings).sort((a, b) => a - b);
+  }, [filterOptions.availableRatings, filters.minRating]);
 
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
@@ -789,7 +835,7 @@ const [filterOptionsError, setFilterOptionsError] = useState("");
                 onChange={updateFilter("language")}
               >
                 <option value="">All languages</option>
-                {LANGUAGES.map(({ value, label }) => (
+                {languageOptions.map(({ value, label }) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
@@ -816,7 +862,7 @@ const [filterOptionsError, setFilterOptionsError] = useState("");
                 onChange={updateFilter("minRating")}
               >
                 <option value="">Any rating</option>
-                {RATING_OPTIONS.map((r) => (
+                {ratingOptions.map((r) => (
                   <option key={r} value={r}>
                     {r}+ rating
                   </option>

@@ -201,40 +201,72 @@ export default async function handler(req, res) {
     const selectedGenres = parseList(genres);
     const selectedDirectors = parseDirectors(directorIds, directors);
 
-    // Shared filter context (filters that apply to ALL three option queries)
-    const base = { search, language, minRating };
+    // Shared base query parameters
+    const base = { search };
 
-    // ── Genre options ──────────────────────────────────────────────────────
-    // Omit selectedGenres so users can change their genre selection freely.
-    // All other active filters still apply.
+    // ── 1. Genre options ───────────────────────────────────────────────────
+    // Omit selectedGenres so users can change or add to their genre selection.
+    // All other active filters (directors, language, years, rating) apply.
     const forGenres = buildWhere({
       ...base,
       selectedGenres: [],          // intentionally omitted
       selectedDirectors,
+      language,
       yearFrom,
       yearTo,
+      minRating,
     });
 
-    // ── Director options ───────────────────────────────────────────────────
+    // ── 2. Director options ────────────────────────────────────────────────
     // Omit selectedDirectors so users can change their director selection.
-    // All other active filters still apply.
+    // All other active filters apply.
     const forDirectors = buildWhere({
       ...base,
       selectedGenres,
       selectedDirectors: { ids: [], names: [] }, // intentionally omitted
+      language,
       yearFrom,
       yearTo,
+      minRating,
     });
 
-    // ── Year options ───────────────────────────────────────────────────────
+    // ── 3. Year options ────────────────────────────────────────────────────
     // Omit yearFrom/yearTo so users can change the range without hiding years.
-    // All other active filters still apply.
+    // All other active filters apply.
     const forYears = buildWhere({
       ...base,
       selectedGenres,
       selectedDirectors,
+      language,
       yearFrom: "",                // intentionally omitted
       yearTo: "",                  // intentionally omitted
+      minRating,
+    });
+
+    // ── 4. Language options ────────────────────────────────────────────────
+    // Omit language so users can change their language selection.
+    // All other active filters apply.
+    const forLanguages = buildWhere({
+      ...base,
+      selectedGenres,
+      selectedDirectors,
+      language: "",                // intentionally omitted
+      yearFrom,
+      yearTo,
+      minRating,
+    });
+
+    // ── 5. Rating options ──────────────────────────────────────────────────
+    // Omit minRating so available threshold choices are calculated from movies
+    // matching all other filters.
+    const forRatings = buildWhere({
+      ...base,
+      selectedGenres,
+      selectedDirectors,
+      language,
+      yearFrom,
+      yearTo,
+      minRating: "",               // intentionally omitted
     });
 
     // Add IS NOT NULL guard for years
@@ -242,10 +274,20 @@ export default async function handler(req, res) {
       ? `${forYears.whereClause} AND m.release_year IS NOT NULL`
       : "WHERE m.release_year IS NOT NULL";
 
-    // Run all three queries concurrently
-    const [genreResult, directorResult, yearResult] = await Promise.all([
+    // Guard for languages (exclude null / empty strings)
+    const languagesWhere = forLanguages.whereClause
+      ? `${forLanguages.whereClause} AND m.original_language IS NOT NULL AND TRIM(m.original_language) != ''`
+      : "WHERE m.original_language IS NOT NULL AND TRIM(m.original_language) != ''";
 
-      // Available genres: distinct genres in movies matching forGenres filters
+    // Run all five queries concurrently
+    const [
+      genreResult,
+      directorResult,
+      yearResult,
+      languageResult,
+      ratingResult,
+    ] = await Promise.all([
+      // Available genres
       db.query(
         `SELECT DISTINCT g.genre_name
          FROM public.genres g
@@ -256,7 +298,7 @@ export default async function handler(req, res) {
         forGenres.values
       ),
 
-      // Available directors: distinct directors in movies matching forDirectors filters
+      // Available directors
       db.query(
         `SELECT DISTINCT d.director_id, d.director_name
          FROM public.directors d
@@ -267,7 +309,7 @@ export default async function handler(req, res) {
         forDirectors.values
       ),
 
-      // Available years: distinct release years in movies matching forYears filters
+      // Available years
       db.query(
         `SELECT DISTINCT m.release_year
          FROM public.movies m
@@ -275,7 +317,33 @@ export default async function handler(req, res) {
          ORDER BY m.release_year DESC`,
         forYears.values
       ),
+
+      // Available languages
+      db.query(
+        `SELECT DISTINCT m.original_language
+         FROM public.movies m
+         ${languagesWhere}
+         ORDER BY m.original_language ASC`,
+        forLanguages.values
+      ),
+
+      // Available minimum rating thresholds (5, 6, 7, 8)
+      db.query(
+        `SELECT
+           BOOL_OR(m.vote_average >= 5) AS "has_5",
+           BOOL_OR(m.vote_average >= 6) AS "has_6",
+           BOOL_OR(m.vote_average >= 7) AS "has_7",
+           BOOL_OR(m.vote_average >= 8) AS "has_8"
+         FROM public.movies m
+         ${forRatings.whereClause}`,
+        forRatings.values
+      ),
     ]);
+
+    const ratingRow = ratingResult.rows[0] || {};
+    const availableRatings = [5, 6, 7, 8].filter(
+      (threshold) => Boolean(ratingRow[`has_${threshold}`])
+    );
 
     return res.status(200).json({
       availableGenres:    genreResult.rows.map((r) => r.genre_name),
@@ -284,6 +352,8 @@ export default async function handler(req, res) {
         name: r.director_name,
       })),
       availableYears:     yearResult.rows.map((r) => r.release_year),
+      availableLanguages: languageResult.rows.map((r) => r.original_language),
+      availableRatings,
     });
   } catch (error) {
     console.error("Filters API error:", error.message);
