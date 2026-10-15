@@ -1630,3 +1630,116 @@ a {
   background-color: #ffffff;
   color: #334155;
 }
+
+/* Mobile: show all six movie columns without horizontal scrolling */
+@media (max-width: 768px) {
+  .table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .movie-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+    white-space: normal;
+  }
+
+  .movie-table th,
+  .movie-table td {
+    padding: 6px 2px;
+    font-size: 9px;
+    line-height: 1.35;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  .movie-table th {
+    font-size: 8px;
+    letter-spacing: 0;
+    white-space: normal;
+  }
+
+  /* Six columns share the available phone width */
+  .movie-table th:nth-child(1),
+  .movie-table td:nth-child(1) { width: 24%; }
+
+  .movie-table th:nth-child(2),
+  .movie-table td:nth-child(2) { width: 12%; }
+
+  .movie-table th:nth-child(3),
+  .movie-table td:nth-child(3) { width: 21%; }
+
+  .movie-table th:nth-child(4),
+  .movie-table td:nth-child(4) { width: 11%; }
+
+  .movie-table th:nth-child(5),
+  .movie-table td:nth-child(5) { width: 15%; }
+
+  .movie-table th:nth-child(6),
+  .movie-table td:nth-child(6) { width: 17%; }
+
+  /* Save space for movie titles */
+  .movie-title {
+    gap: 0;
+    min-width: 0;
+  }
+
+  .movie-poster-icon {
+    display: none;
+  }
+
+  .movie-title > div {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .movie-title strong {
+    max-width: 100%;
+    font-size: 9px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .movie-title > div > span {
+    font-size: 8px;
+  }
+
+  /* Compact genre tags */
+  .genre-tags {
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .genre-tags span {
+    max-width: 100%;
+    padding: 2px 3px;
+    font-size: 7px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Compact rating badge */
+  .rating-badge {
+    gap: 2px;
+    padding: 2px;
+    font-size: 8px;
+    white-space: nowrap;
+  }
+
+  .rating-badge svg {
+    display: none;
+  }
+
+  .movie-table th:first-child,
+  .movie-table td:first-child {
+    padding-left: 4px;
+  }
+
+  .movie-table th:last-child,
+  .movie-table td:last-child {
+    padding-right: 4px;
+  }
+}

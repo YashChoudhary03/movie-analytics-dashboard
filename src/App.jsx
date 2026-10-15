@@ -163,6 +163,28 @@ const [filterOptionsError, setFilterOptionsError] = useState("");
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
 
+  const [isMobile, setIsMobile] = useState(() =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(max-width: 768px)").matches
+);
+
+const pageSize = isMobile ? 8 : PAGE_SIZE;
+
+useEffect(() => {
+  const mediaQuery = window.matchMedia("(max-width: 768px)");
+
+  const handleScreenChange = () => {
+    setIsMobile(mediaQuery.matches);
+    setPage(1);
+  };
+
+  mediaQuery.addEventListener("change", handleScreenChange);
+
+  return () => {
+    mediaQuery.removeEventListener("change", handleScreenChange);
+  };
+}, []);
+
   // Dropdown open states
   const [genreMenuOpen, setGenreMenuOpen] = useState(false);
   const [directorMenuOpen, setDirectorMenuOpen] = useState(false);
@@ -312,7 +334,7 @@ const [filterOptionsError, setFilterOptionsError] = useState("");
       try {
         const params = new URLSearchParams({
           page: String(page),
-          limit: String(PAGE_SIZE),
+        limit: String(pageSize),
           sort,
         });
 
@@ -356,6 +378,7 @@ const [filterOptionsError, setFilterOptionsError] = useState("");
     debouncedYearFrom,
     debouncedYearTo,
     reloadKey,
+    pageSize,
   ]);
 
 
