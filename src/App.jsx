@@ -948,16 +948,22 @@ useEffect(() => {
 
             <div className="table-wrap">
               <table className="movie-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Movie</th>
-                    <th scope="col">Release year</th>
-                    <th scope="col">Genre</th>
-                    <th scope="col">Rating</th>
-                    <th scope="col">Popularity</th>
-                    <th scope="col">Revenue</th>
-                  </tr>
-                </thead>
+               <thead>
+                <tr>
+                  <th scope="col">Movie</th>
+                  <th scope="col">
+                     <span className="desktop-column-label">Release year</span>
+                     <span className="mobile-column-label">Year</span>
+                  </th>
+                  <th scope="col">Genre</th>
+                  <th scope="col">Rating</th>
+                  <th scope="col">
+                    <span className="desktop-column-label">Popularity</span>
+                    <span className="mobile-column-label">Pop.</span>
+                  </th>
+                   <th scope="col">Revenue</th>
+                 </tr>
+              </thead>
                 <tbody>
                   {moviesLoading ? (
                     <MessageRow>

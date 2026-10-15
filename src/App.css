@@ -1743,3 +1743,23 @@ a {
     padding-right: 4px;
   }
 }
+
+/* Responsive table column headings */
+.mobile-column-label {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop-column-label {
+    display: none;
+  }
+
+  .mobile-column-label {
+    display: inline;
+  }
+
+  .movie-table th {
+    overflow-wrap: normal;
+    word-break: keep-all;
+  }
+}
